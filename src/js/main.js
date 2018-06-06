@@ -6,13 +6,15 @@ import {
   fetchCuisines,
   fetchRestaurantByCuisineAndNeighborhood,
   mapMarkerForRestaurant,
-  urlForRestaurant
+  updateRestaurant
 } from "./dbhelper";
 
 import "../css/normalize.css";
 import "../css/styles.css";
-import { getImage } from "./imageLoader";
-import { initMap } from "./mapsLoader";
+import { initMap, setMarkers } from "./mapsLoader";
+import RestaurantList from "./RestaurantList";
+import { render } from "lit-html";
+import { getSelectedCuisineAndNeighborhood } from "./Toolbar";
 
 // Check for Service Worker Support
 if ("serviceWorker" in navigator) {
@@ -24,14 +26,16 @@ if ("serviceWorker" in navigator) {
 // Global State container used to keep track of the Google Map
 window.state = {
   markers: [],
-  map: {}
+  map: {},
+  restaurants: [],
+  mapClosed: true
 };
 
 /**
  * Fetch neighborhoods and cuisines as soon as the page is loaded.
  */
 document.addEventListener("DOMContentLoaded", event => {
-  loadMap();
+  updateRestaurants();
   fetchAndFillNeighborhoods();
   fetchAndFillCuisines();
 });
@@ -109,22 +113,16 @@ function loadMap() {
 /**
  * Update page and map for current restaurants.
  */
-const updateRestaurants = () => {
-  const cSelect = document.getElementById("cuisines-select");
-  const nSelect = document.getElementById("neighborhoods-select");
-
-  const cIndex = cSelect.selectedIndex;
-  const nIndex = nSelect.selectedIndex;
-
-  const cuisine = cSelect[cIndex].value;
-  const neighborhood = nSelect[nIndex].value;
+export const updateRestaurants = () => {
+  const { cuisine, neighborhood } = getSelectedCuisineAndNeighborhood();
   fetchRestaurantByCuisineAndNeighborhood(
     cuisine,
     neighborhood,
     (err, filteredRestaurants) => {
       if (err) throw err;
-      resetRestaurants(filteredRestaurants);
-      fillRestaurantsHTML(filteredRestaurants);
+      clearMarkers(filteredRestaurants);
+      renderRestaurantList(filteredRestaurants);
+      setMarkers(filteredRestaurants);
     }
   );
 };
@@ -133,13 +131,9 @@ const updateRestaurants = () => {
 window.updateRestaurants = updateRestaurants;
 
 /**
- * Clear current restaurants, their HTML and remove their map markers.
+ * Remove all map markers.
  */
-const resetRestaurants = restaurants => {
-  const ul = document.getElementById("restaurants-list");
-  ul.innerHTML = "";
-
-  // Remove all map markers
+const clearMarkers = restaurants => {
   state.markers.forEach(m => m.setMap(null));
   state.markers = [];
 };
@@ -147,64 +141,23 @@ const resetRestaurants = restaurants => {
 /**
  * Create all restaurants HTML and add them to the webpage.
  */
-const fillRestaurantsHTML = restaurants => {
-  const ul = document.getElementById("restaurants-list");
-  restaurants.forEach(restaurant => {
-    ul.append(createRestaurantHTML(restaurant));
-  });
-  addMarkersToMap(restaurants);
+const renderRestaurantList = restaurants => {
+  const restaurantListMountPoint = document.getElementById("restaurants-list");
+  render(RestaurantList(restaurants), restaurantListMountPoint);
 };
 
-/**
- * Create restaurant HTML.
- */
-const createRestaurantHTML = restaurant => {
-  const imageFile = getImage(restaurant.photograph);
-  const li = document.createElement("li");
-  const wrapper = document.createElement("div");
-  wrapper.className = "responsively-lazy";
-  const image = document.createElement("img");
-  image.className = "restaurant-img";
-  image.setAttribute("alt", `Image of ${restaurant.name}`);
-  image.setAttribute("sizes", "(max-width: 450px) 90vw, 600px");
-  image.setAttribute("data-srcset", imageFile.srcSet);
-  image.setAttribute(
-    "srcset",
-    "data:image/gif;base64,R0lGODlhAQABAIAAAP///////yH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="
-  );
-  image.src = imageFile.src;
-  wrapper.append(image);
-  li.append(wrapper);
+const toggleMapBtn = document.querySelector("#maptoggle");
+const mapContainer = document.querySelector("#map-container");
 
-  const name = document.createElement("h1");
-  name.innerHTML = restaurant.name;
-  li.append(name);
-
-  const neighborhood = document.createElement("p");
-  neighborhood.innerHTML = restaurant.neighborhood;
-  li.append(neighborhood);
-
-  const address = document.createElement("p");
-  address.innerHTML = restaurant.address;
-  li.append(address);
-
-  const more = document.createElement("a");
-  more.innerHTML = "View Details";
-  more.href = urlForRestaurant(restaurant);
-  li.append(more);
-  return li;
-};
-
-/**
- * Add markers for current restaurants to the map.
- */
-const addMarkersToMap = (restaurants, map = window.state.map) => {
-  restaurants.forEach(restaurant => {
-    // Add marker to the map
-    const marker = mapMarkerForRestaurant(restaurant, map);
-    google.maps.event.addListener(marker, "click", () => {
-      window.location.href = marker.url;
-    });
-    state.markers.push(marker);
-  });
-};
+toggleMapBtn.addEventListener("click", () => {
+  if (window.state.mapClosed) {
+    mapContainer.style.height = "50vh";
+    window.state.mapClosed = false;
+    toggleMapBtn.setAttribute("aria-pressed", "true");
+    loadMap();
+  } else {
+    mapContainer.style.height = "0vh";
+    window.state.mapClosed = true;
+    toggleMapBtn.setAttribute("aria-pressed", "false");
+  }
+});

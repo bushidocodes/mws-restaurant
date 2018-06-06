@@ -1,9 +1,16 @@
-import { mapMarkerForRestaurant, fetchRestaurantById } from "./dbhelper";
+import {
+  mapMarkerForRestaurant,
+  fetchRestaurantById,
+  fetchReviewsForRestaurant,
+  postReview
+} from "./dbhelper";
 import { getImage } from "./imageLoader";
 import { initMap } from "./mapsLoader";
+import CreateReviewModal from "./CreateReviewModal";
 
 import "../css/normalize.css";
 import "../css/styles.css";
+import { html, render } from "lit-html";
 
 // Check for Service Worker Support
 if ("serviceWorker" in navigator) {
@@ -15,7 +22,8 @@ if ("serviceWorker" in navigator) {
 window.state = {
   markers: [],
   map: undefined,
-  restaurant: undefined
+  restaurant: undefined,
+  mapClosed: true
 };
 
 document.addEventListener("DOMContentLoaded", event => {
@@ -53,7 +61,7 @@ const fetchRestaurantFromURL = cb => {
     cb(null, self.restaurant);
   } else if (!id) {
     // no id found in URL
-    error = "No restaurant id in URL";
+    const error = "No restaurant id in URL";
     cb(error);
   } else {
     fetchRestaurantById(id, (err, restaurant) => {
@@ -62,18 +70,41 @@ const fetchRestaurantFromURL = cb => {
       } else {
         self.restaurant = restaurant;
         if (restaurant) {
-          fillRestaurantHTML(restaurant); // writes restaurant to the DOM
-          cb(null, restaurant);
+          fetchReviewsForRestaurant(restaurant.id, (err, reviews) => {
+            if (err) {
+              cb(err, null);
+            } else {
+              fillRestaurantHTML(restaurant, reviews); // writes restaurant to the DOM
+              cb(null, restaurant, reviews);
+            }
+          });
         }
       }
     });
   }
 };
+/**
+ * Get current restaurant from page URL.
+ */
+const fetchReviewsFromURL = () => {
+  console.log("Fetching Reviews");
+  const id = getParameterByName("id");
+  fetchReviewsForRestaurant(id, (err, reviews) => {
+    if (err) {
+      console.log(err);
+    } else {
+      fillRestaurantHTML(restaurant, reviews); // writes restaurant to the DOM
+    }
+  });
+};
 
 /**
  * Create restaurant HTML and add it to the webpage
  */
-const fillRestaurantHTML = (restaurant = self.restaurant) => {
+const fillRestaurantHTML = (
+  restaurant = self.restaurant,
+  reviews = self.reviews
+) => {
   const name = document.getElementById("restaurant-name");
   name.innerHTML = restaurant.name;
 
@@ -95,7 +126,7 @@ const fillRestaurantHTML = (restaurant = self.restaurant) => {
     fillRestaurantHoursHTML();
   }
   // fill reviews
-  fillReviewsHTML(restaurant.reviews);
+  fillReviewsHTML(reviews);
 };
 
 /**
@@ -121,52 +152,42 @@ const fillRestaurantHoursHTML = (
   }
 };
 
-/**
- * Create all reviews HTML and add them to the webpage.
- */
-const fillReviewsHTML = (reviews = self.restaurant.reviews) => {
-  const container = document.getElementById("reviews-container");
-  container.innerHTML = "";
-  const title = document.createElement("h2");
-  title.innerHTML = "Reviews";
-  container.appendChild(title);
+const NoReviews = () => html`
+  <p>No Reviews yet!</p>
+  `;
 
-  if (!reviews) {
-    const noReviews = document.createElement("p");
-    noReviews.innerHTML = "No reviews yet!";
-    container.appendChild(noReviews);
-    return;
-  }
-  const reviewList = document.createElement("ul");
-  reviewList.id = "reviews-list";
-  reviews.forEach(review => {
-    reviewList.appendChild(createReviewHTML(review));
-  });
-  container.appendChild(reviewList);
-};
+const ReviewList = reviews => html`
+  ${reviews.map(review => Review(review))}
+`;
 
 /**
  * Create review HTML and add it to the webpage.
  */
-const createReviewHTML = review => {
-  const li = document.createElement("li");
-  const name = document.createElement("p");
-  name.innerHTML = review.name;
-  li.appendChild(name);
+const Review = review => html`
+  <li>
+    <p>${review.name}</p>
+    <p>Created At: ${new Date(review.createdAt).toLocaleDateString() +
+      " " +
+      new Date(review.createdAt).toLocaleTimeString()}
+    </p>
+    <p>Updated At: ${new Date(review.createdAt).toLocaleDateString() +
+      " " +
+      new Date(review.createdAt).toLocaleTimeString()}
+    </p>
+    <p>Rating: ${review.rating}</p>
+    <p>${review.comments}</p>
+  </li>
+  `;
 
-  const date = document.createElement("p");
-  date.innerHTML = review.date;
-  li.appendChild(date);
-
-  const rating = document.createElement("p");
-  rating.innerHTML = `Rating: ${review.rating}`;
-  li.appendChild(rating);
-
-  const comments = document.createElement("p");
-  comments.innerHTML = review.comments;
-  li.appendChild(comments);
-
-  return li;
+/**
+ * Create all reviews HTML and add them to the webpage.
+ */
+const fillReviewsHTML = (reviews = self.restaurant.reviews) => {
+  const reviewsList = document.getElementById("reviews-list");
+  render(
+    reviews && reviews.length ? ReviewList(reviews) : NoReviews(),
+    reviewsList
+  );
 };
 
 /**
@@ -198,3 +219,51 @@ const getParameterByName = (name, url) => {
   if (!results[2]) return "";
   return decodeURIComponent(results[2].replace(/\+/g, " "));
 };
+
+const CRM = new CreateReviewModal({
+  restaurantID: getParameterByName("id"),
+  onSubmit: postBody =>
+    postReview(postBody).then(() => {
+      // If we don't support background syncing, refresh after 500ms
+      if (!"SyncManager" in window) {
+        window.setTimeout(() => {
+          fetchReviewsFromURL();
+        }, 500);
+      }
+    })
+});
+
+const addReviewButton = document.querySelector("#add-review-btn");
+addReviewButton.addEventListener("click", () => CRM.open());
+
+if ("serviceWorker" in navigator) {
+  // Handler for messages coming from the service worker
+  navigator.serviceWorker.addEventListener("message", event => {
+    console.log("[App] Received Message from SW: " + event.data);
+    // This is not really used, but this shows how to send an immediate response using the second channel
+    event.ports[0].postMessage("ACK");
+    switch (event.data) {
+      // Allows the service worker to tell the client to refresh the reviews if new posts are available
+      case "refresh":
+        console.log("[App] Instructed to Refresh Cards: " + event.data);
+        fetchReviewsFromURL();
+        break;
+    }
+  });
+}
+
+const toggleMapBtn = document.querySelector("#maptoggle");
+const mapContainer = document.querySelector("#map-container");
+
+toggleMapBtn.addEventListener("click", () => {
+  if (window.state.mapClosed) {
+    mapContainer.style.height = "50vh";
+    window.state.mapClosed = false;
+    toggleMapBtn.setAttribute("aria-pressed", "true");
+    loadMap();
+  } else {
+    mapContainer.style.height = "0vh";
+    window.state.mapClosed = true;
+    toggleMapBtn.setAttribute("aria-pressed", "false");
+  }
+});
