@@ -7,7 +7,7 @@ import {
 } from "./js/utils";
 import { postReviewDirectly } from "./js/dbhelper";
 
-const APP_VERSION = 2;
+const APP_VERSION = 3;
 const SERVER = `http://localhost:1337`;
 
 /**
@@ -28,7 +28,9 @@ workbox.routing.registerRoute(
   })
 );
 
-self.__precacheManifest = [].concat(self.__precacheManifest || []);
+self.__precacheManifest = ["/manifest.json"].concat(
+  self.__precacheManifest || []
+);
 workbox.precaching.suppressWarnings();
 workbox.precaching.precacheAndRoute(self.__precacheManifest, {});
 
@@ -172,37 +174,42 @@ function send_message_to_all_clients(msg) {
 
 function syncNewReviews() {
   return getItems("sync-reviews").then(reviews => {
-    const arrOfPromises = reviews.map(review => {
-      return postReviewDirectly(review)
-        .then(resBody => {
-          // and delete the review from the sync-reviews store if successful
-          console.log(`[SW] Synced review with server`, resBody);
-          return deleteItem("sync-reviews", [
-            resBody.name,
-            resBody.restaurant_id
-          ]);
+    if (reviews && reviews.length > 0) {
+      const arrOfPromises = reviews.map(review => {
+        return postReviewDirectly(review)
+          .then(resBody => {
+            // and delete the review from the sync-reviews store if successful
+            console.log(`[SW] Synced review with server`, resBody);
+            return deleteItem("sync-reviews", [
+              resBody.name,
+              resBody.restaurant_id
+            ]);
+          })
+          .catch(err => {
+            console.log(`[SW] Error syncing review ${review.name}`, err);
+            return Promise.reject(err);
+          });
+      });
+      // After all reviews are successfully uploaded
+      return Promise.all(arrOfPromises)
+        .then(res => {
+          console.log(`[SW] Successfully synced all reviews to server`);
+          // tell all clients to refresh their reviews
+          send_message_to_all_clients("refresh");
+          return Promise.resolve(res);
         })
         .catch(err => {
-          console.log(`[SW] Error syncing review ${review.id}`, err);
+          console.log(`[SW] Failed to sync all reviews to server`, err);
           return Promise.reject(err);
         });
-    });
-    // After all reviews are successfully uploaded
-    return Promise.all(arrOfPromises)
-      .then(res => {
-        console.log(`[SW] Successfully synced all reviews to server`);
-        // tell all clients to refresh their reviews
-        send_message_to_all_clients("refresh");
-        return Promise.resolve(res);
-      })
-      .catch(err => {
-        console.log(`[SW] Failed to sync all reviews to server`, err);
-        return Promise.reject(err);
-      });
+    } else {
+      console.log(`[SW] No reviews to sync`);
+    }
   });
 }
 
 self.addEventListener("sync", function(event) {
+  console.log(`[SW] Receiving sync event ${event.tag}`);
   switch (event.tag) {
     case "sync-new-reviews":
       return event.waitUntil(syncNewReviews());

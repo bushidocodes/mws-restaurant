@@ -161,3 +161,7 @@ toggleMapBtn.addEventListener("click", () => {
     toggleMapBtn.setAttribute("aria-pressed", "false");
   }
 });
+
+// Trigger any queued reviews
+console.log("[app] sending sync-new-reviews");
+navigator.serviceWorker.ready.then(sw => sw.sync.register("sync-new-reviews"));

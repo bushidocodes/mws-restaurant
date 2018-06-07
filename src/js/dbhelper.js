@@ -259,7 +259,7 @@ export function fetchReviewsForRestaurant(restaurantID, callback) {
   let networkDataReceived = false;
   fetch(`${SERVER}/reviews/?restaurant_id=${restaurantID}`)
     .then(res => {
-      if (res) {
+      if (res && res.ok) {
         return res.json();
       }
     })
@@ -277,7 +277,7 @@ export function fetchReviewsForRestaurant(restaurantID, callback) {
   if ("indexedDB" in window) {
     getItems("reviews").then(reviews => {
       const reviewsForThisRestaurant = reviews.filter(
-        review => review.restaurant_id === restaurantID
+        review => review.restaurant_id == restaurantID
       );
       if (!networkDataReceived) {
         callback(null, reviewsForThisRestaurant);
