@@ -199,8 +199,12 @@ function syncNewReviews() {
           return Promise.resolve(res);
         })
         .catch(err => {
-          console.log(`[SW] Failed to sync all reviews to server`, err);
-          return Promise.reject(err);
+          let humanFriendlyErrorMessage =
+            err == "TypeError: Failed to fetch"
+              ? `[SW] Unable to sync reviews with server. This is probably because you are offline`
+              : `[SW] Unable to sync reviews with server due to an unknown error. Please contact the developer with the following error message: ${err}`;
+          console.log(humanFriendlyErrorMessage);
+          return Promise.reject(humanFriendlyErrorMessage);
         });
     } else {
       console.log(`[SW] No reviews to sync`);
@@ -212,7 +216,7 @@ self.addEventListener("sync", function(event) {
   console.log(`[SW] Receiving sync event ${event.tag}`);
   switch (event.tag) {
     case "sync-new-reviews":
-      return event.waitUntil(syncNewReviews());
+      return event.waitUntil(syncNewReviews().catch(e => console.log(e)));
     default:
       console.log(`[SW] Error: ${event.tag} is an unknown sync tag`);
   }
