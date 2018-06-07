@@ -26,7 +26,7 @@ if ("serviceWorker" in navigator) {
 // Global State container used to keep track of the Google Map
 window.state = {
   markers: [],
-  map: {},
+  map: undefined,
   restaurants: [],
   mapClosed: true
 };
@@ -120,9 +120,11 @@ export const updateRestaurants = () => {
     neighborhood,
     (err, filteredRestaurants) => {
       if (err) throw err;
-      clearMarkers(filteredRestaurants);
       renderRestaurantList(filteredRestaurants);
-      setMarkers(filteredRestaurants);
+      if (window.state.map) {
+        clearMarkers();
+        setMarkers(filteredRestaurants);
+      }
     }
   );
 };
@@ -133,7 +135,7 @@ window.updateRestaurants = updateRestaurants;
 /**
  * Remove all map markers.
  */
-const clearMarkers = restaurants => {
+const clearMarkers = () => {
   state.markers.forEach(m => m.setMap(null));
   state.markers = [];
 };
