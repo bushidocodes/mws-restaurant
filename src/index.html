@@ -26,18 +26,18 @@
   <header>
     <div id="titlebar">
       <h1>
-        <a href="/">Restaurant Reviews</a>
+        <a tabindex="0" href="/">Restaurant Reviews</a>
       </h1>
     </div>
     <!-- Beginning breadcrumb -->
     <nav aria-label="Breadcrumb">
       <ol id="breadcrumb">
         <li>
-          <a href="/" aria-current="page">Home</a>
+          <a tabindex="0" href="/" aria-current="page">Home</a>
         </li>
       </ol>
     </nav>
-    <button id="maptoggle" type="button" role="button" aria-label="Toggle Google Map" aria-pressed="false">Toggle Map</button>
+    <button tabindex="0" id="maptoggle" type="button" role="button" aria-label="Toggle Google Map" aria-pressed="false">Toggle Map</button>
     <!-- End s -->
   </header>
 
@@ -49,11 +49,11 @@
       <div class="filter-options">
         <h2>Filter Results</h2>
         <label hidden id="neighborhoods-label">Filter Restaurants by Neighborhood</label>
-        <select id="neighborhoods-select" name="neighborhoods" aria-labelledby="neighborhoods-label" onchange="updateRestaurants()">
+        <select tabindex="0" id="neighborhoods-select" name="neighborhoods" aria-labelledby="neighborhoods-label" onchange="updateRestaurants()">
           <option value="all">All Neighborhoods</option>
         </select>
         <label hidden id="cuisines-label">Filter by Cuisine Type</label>
-        <select id="cuisines-select" name="cuisines" aria-labelledby="cuisines-label" onchange="updateRestaurants()">
+        <select tabindex="0" id="cuisines-select" name="cuisines" aria-labelledby="cuisines-label" onchange="updateRestaurants()">
           <option value="all">All Cuisines</option>
         </select>
       </div>
@@ -66,7 +66,7 @@
   <footer id="footer">
     <div class="center">
       Copyright (c) 2018
-      <a href="/">
+      <a tabindex="0" href="/">
         <strong>Restaurant Reviews</strong>
       </a> All Rights Reserved.
     </div>

@@ -205,6 +205,7 @@ function fillBreadcrumb(restaurant = window.state.restaurant) {
   const anchor = document.createElement("a");
   anchor.setAttribute("href", `restaurant.html?id=${restaurant.id}`);
   anchor.setAttribute("aria-current", "page");
+  anchor.setAttribute("tabindex", "0");
   anchor.innerText = restaurant.name;
   const li = document.createElement("li");
   li.appendChild(anchor);

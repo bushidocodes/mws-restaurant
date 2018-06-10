@@ -41,8 +41,9 @@ function Restaurant(restaurant) {
   <p>${restaurant.neighborhood}</p>
   <p>${restaurant.address}</p>
   <div style="display: flex; flex-direction: row; justify-content: space-between;">
-    <a href=${urlForRestaurant(restaurant)}>View Details</a>
+    <a tabindex="0" href=${urlForRestaurant(restaurant)}>View Details</a>
   <button 
+    tabindex="0"
     type="button"
     role="button"
     aria-label="Mark ${restaurant.name} as Favorite"
