@@ -16,7 +16,7 @@ const SERVER = `http://localhost:1337`;
  * See https://goo.gl/S9QRab
  */
 
-// Cache Web Fonts
+// Cache Google fonts and map tiles
 workbox.routing.registerRoute(
   /.*(?:googleapis|gstatic)\.com.*$/,
   workbox.strategies.staleWhileRevalidate({
@@ -45,7 +45,6 @@ workbox.routing.registerRoute(
   workbox.strategies.staleWhileRevalidate({
     cacheName: "restaurant-images",
     cacheExpiration: {
-      maxEntries: 3,
       maxAgeSeconds: 60 * 60 * 24 * 30
     }
   })
@@ -54,19 +53,25 @@ workbox.routing.registerRoute(
 workbox.routing.registerRoute(
   ({ url }) => url.pathname === "/restaurants",
   ({ url, event, params }) =>
-    fetch(event.request).then(res => {
-      if (res.ok) {
-        const cloneRes = res.clone();
-        deleteItems("restaurants").then(() =>
-          cloneRes.json().then(resAsJSON => {
-            resAsJSON.forEach(item => {
-              writeItem("restaurants", item);
-            });
-          })
-        );
-      }
-      return res;
-    })
+    fetch(event.request)
+      .then(res => {
+        if (res.ok) {
+          const cloneRes = res.clone();
+          deleteItems("restaurants").then(() =>
+            cloneRes.json().then(resAsJSON => {
+              resAsJSON.forEach(item => {
+                writeItem("restaurants", item);
+              });
+            })
+          );
+        }
+        return res;
+      })
+      .catch(err => {
+        console.log(err);
+        // We need to return a rejected Promise
+        return Promise.reject(err);
+      })
 );
 
 const restaurantByIDMatcher = new RegExp(
