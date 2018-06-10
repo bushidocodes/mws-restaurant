@@ -15,7 +15,7 @@ import { html, render } from "lit-html";
 // Check for Service Worker Support
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").then(() => {
-    console.log("Service Worker Registered");
+    console.log("[App] Service Worker Registered");
   });
 }
 
@@ -55,10 +55,10 @@ function loadMap() {
 /**
  * Get current restaurant from page URL.
  */
-const fetchRestaurantFromURL = cb => {
+function fetchRestaurantFromURL(cb) {
   const id = getParameterByName("id");
   if (window.state.restaurant) {
-    console.log("restaurant already fetched!");
+    console.log("[App] Restaurant already fetched!");
     // restaurant already fetched!
     cb(null, window.state.restaurant);
   } else if (!id) {
@@ -76,12 +76,12 @@ const fetchRestaurantFromURL = cb => {
       }
     });
   }
-};
+}
 
 /**
  * Create restaurant HTML and add it to the webpage
  */
-const fillRestaurantHTML = (restaurant = window.state.restaurant) => {
+function fillRestaurantHTML(restaurant = window.state.restaurant) {
   const name = document.getElementById("restaurant-name");
   name.innerHTML = restaurant.name;
 
@@ -102,14 +102,14 @@ const fillRestaurantHTML = (restaurant = window.state.restaurant) => {
   if (restaurant.operating_hours) {
     fillRestaurantHoursHTML();
   }
-};
+}
 
 /**
  * Create restaurant operating hours HTML table and add it to the webpage.
  */
-const fillRestaurantHoursHTML = (
+function fillRestaurantHoursHTML(
   operatingHours = window.state.restaurant.operating_hours
-) => {
+) {
   const hours = document.getElementById("restaurant-hours");
   hours.innerHTML = "";
   for (let key in operatingHours) {
@@ -125,14 +125,16 @@ const fillRestaurantHoursHTML = (
 
     hours.appendChild(row);
   }
-};
+}
 
 const NoReviews = () => html`
   <p>No Reviews yet!</p>
   `;
 
 const ReviewList = reviews => html`
-  ${reviews.map(review => Review(review))}
+  ${reviews.map(
+    review => (review.isDraft ? DraftReview(review) : Review(review))
+  )}
 `;
 
 /**
@@ -141,14 +143,25 @@ const ReviewList = reviews => html`
 const Review = review => html`
   <li>
     <p>${review.name}</p>
-    <p>Created At: ${new Date(review.createdAt).toLocaleDateString() +
-      " " +
-      new Date(review.createdAt).toLocaleTimeString()}
+    <p>Created At: ${new Date(
+      review.createdAt
+    ).toLocaleDateString()} ${new Date(review.createdAt).toLocaleTimeString()}
     </p>
-    <p>Updated At: ${new Date(review.createdAt).toLocaleDateString() +
-      " " +
-      new Date(review.createdAt).toLocaleTimeString()}
+    <p>Updated At: ${new Date(
+      review.updatedAt
+    ).toLocaleDateString()} ${new Date(review.updatedAt).toLocaleTimeString()}
     </p>
+    <p>Rating: ${review.rating}</p>
+    <p>${review.comments}</p>
+  </li>
+  `;
+/**
+ * Create review HTML and add it to the webpage.
+ */
+const DraftReview = review => html`
+  <li>
+    <p>DRAFT</p>
+    <p>${review.name}</p>
     <p>Rating: ${review.rating}</p>
     <p>${review.comments}</p>
   </li>
@@ -157,33 +170,34 @@ const Review = review => html`
 /**
  * Get current reviews from page URL.
  */
-const fetchReviewsFromURL = () => {
+function fetchReviewsFromURL() {
   const id = getParameterByName("id");
   fetchReviewsForRestaurant(id, (err, reviews) => {
     if (err) {
-      console.log(err);
+      console.log("[App] Error fetching reviews: ", err);
     } else {
+      console.log("[App] Rendering reviews: ", reviews);
       fillReviewsHTML(reviews); // writes restaurant to the DOM
       window.state.reviews = reviews;
     }
   });
-};
+}
 
 /**
  * Create all reviews HTML and add them to the webpage.
  */
-const fillReviewsHTML = (reviews = window.state.reviews) => {
+function fillReviewsHTML(reviews = window.state.reviews) {
   const reviewsList = document.getElementById("reviews-list");
   render(
     reviews && reviews.length ? ReviewList(reviews) : NoReviews(),
     reviewsList
   );
-};
+}
 
 /**
  * Add restaurant name to the breadcrumb navigation menu
  */
-const fillBreadcrumb = (restaurant = window.state.restaurant) => {
+function fillBreadcrumb(restaurant = window.state.restaurant) {
   const breadcrumb = document.getElementById("breadcrumb");
   while (breadcrumb.children.length > 1) {
     breadcrumb.removeChild(breadcrumb.lastChild);
@@ -195,12 +209,12 @@ const fillBreadcrumb = (restaurant = window.state.restaurant) => {
   const li = document.createElement("li");
   li.appendChild(anchor);
   breadcrumb.appendChild(li);
-};
+}
 
 /**
  * Get a parameter by name from page URL.
  */
-const getParameterByName = (name, url) => {
+function getParameterByName(name, url) {
   if (!url) url = window.location.href;
   name = name.replace(/[\[\]]/g, "\\$&");
   const regex = new RegExp(`[?&]${name}(=([^&#]*)|&|#|$)`),
@@ -208,7 +222,7 @@ const getParameterByName = (name, url) => {
   if (!results) return null;
   if (!results[2]) return "";
   return decodeURIComponent(results[2].replace(/\+/g, " "));
-};
+}
 
 const CRM = new CreateReviewModal({
   restaurantID: getParameterByName("id"),
@@ -259,5 +273,5 @@ toggleMapBtn.addEventListener("click", () => {
 });
 
 // Trigger any queued reviews
-console.log("[app] sending sync-new-reviews");
+console.log("[App] sending sync-new-reviews");
 navigator.serviceWorker.ready.then(sw => sw.sync.register("sync-new-reviews"));

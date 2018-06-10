@@ -165,5 +165,5 @@ toggleMapBtn.addEventListener("click", () => {
 });
 
 // Trigger any queued reviews
-console.log("[app] sending sync-new-reviews");
+console.log("[App] sending sync-new-reviews");
 navigator.serviceWorker.ready.then(sw => sw.sync.register("sync-new-reviews"));

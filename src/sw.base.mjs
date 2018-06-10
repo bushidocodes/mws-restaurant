@@ -75,16 +75,18 @@ const restaurantByIDMatcher = new RegExp(
 const restaurantByIDHandler = ({ url, event, params }) => {
   const matchRestaurantID = /\/restaurants\/([0-9]+)/g;
   const restaurantID = matchRestaurantID.exec(url)[1];
-  fetch(event.request).then(res => {
-    const cloneRes = res.clone();
-    if (cloneRes.ok) {
-      cloneRes
-        .json()
-        .then(restaurant => writeItem("restaurants", restaurant))
-        .catch(err => console.log("ERR: ", err));
-    }
-    return res;
-  });
+  fetch(event.request)
+    .then(res => {
+      const cloneRes = res.clone();
+      if (cloneRes.ok) {
+        cloneRes
+          .json()
+          .then(restaurant => writeItem("restaurants", restaurant))
+          .catch(err => console.log(err));
+      }
+      return res;
+    })
+    .catch(err => console.log(err));
 };
 
 // Because PUT and POST return the resulting object, we can reuse the logic for GET
@@ -109,22 +111,24 @@ const reviewsByRestaurantIDMatcher = new RegExp(
   /http:\/\/localhost:1337\/reviews\/\?restaurant_id=[0-9]+/
 );
 const reviewsByRestaurantIDHandler = ({ url, event, params }) => {
-  fetch(event.request).then(res => {
-    const cloneRes = res.clone();
-    if (cloneRes.ok) {
-      cloneRes
-        .json()
-        .then(dirtyReviews =>
-          dirtyReviews.map(dirtyReview => sanitizeReview(dirtyReview))
-        )
-        .then(cleanReviews => {
-          cleanReviews.forEach(review => {
-            writeItem("reviews", review);
+  fetch(event.request)
+    .then(res => {
+      const cloneRes = res.clone();
+      if (cloneRes.ok) {
+        cloneRes
+          .json()
+          .then(dirtyReviews =>
+            dirtyReviews.map(dirtyReview => sanitizeReview(dirtyReview))
+          )
+          .then(cleanReviews => {
+            cleanReviews.forEach(review => {
+              writeItem("reviews", review);
+            });
           });
-        });
-    }
-    return res;
-  });
+      }
+      return res;
+    })
+    .catch(err => console.log(err));
 };
 
 workbox.routing.registerRoute(
@@ -172,6 +176,12 @@ function send_message_to_all_clients(msg) {
   });
 }
 
+// If the SW is unable to submit reviews by the timeout, tell the client to render the draft card
+const SUBMIT_REVIEWS_TIMEOUT = 1000;
+// lock to ensure that if we hit an error condition, only the timeout or the error message fires,
+// so the client doesn't render more than once
+let notifiedClient = false;
+
 function syncNewReviews() {
   return getItems("sync-reviews").then(reviews => {
     if (reviews && reviews.length > 0) {
@@ -190,12 +200,19 @@ function syncNewReviews() {
             return Promise.reject(err);
           });
       });
+      setTimeout(() => {
+        if (!notifiedClient) {
+          send_message_to_all_clients("refresh");
+          notifiedClient = true;
+        }
+      }, SUBMIT_REVIEWS_TIMEOUT);
       // After all reviews are successfully uploaded
       return Promise.all(arrOfPromises)
         .then(res => {
           console.log(`[SW] Successfully synced all reviews to server`);
           // tell all clients to refresh their reviews
           send_message_to_all_clients("refresh");
+          notifiedClient = true;
           return Promise.resolve(res);
         })
         .catch(err => {
@@ -203,6 +220,10 @@ function syncNewReviews() {
             err == "TypeError: Failed to fetch"
               ? `[SW] Unable to sync reviews with server. This is probably because you are offline`
               : `[SW] Unable to sync reviews with server due to an unknown error. Please contact the developer with the following error message: ${err}`;
+          if (!notifiedClient) {
+            send_message_to_all_clients("refresh");
+            notifiedClient = true;
+          }
           console.log(humanFriendlyErrorMessage);
           return Promise.reject(humanFriendlyErrorMessage);
         });

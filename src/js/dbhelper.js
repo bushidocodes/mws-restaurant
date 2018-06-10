@@ -20,10 +20,7 @@ export function fetchRestaurants(callback) {
         callback(null, data);
       }
     })
-    .catch(err => {
-      // Oops!. Got an error from server.
-      const error = `Request failed. Returned status of ${err}`;
-    });
+    .catch(err => console.log(err));
   // Fetch from IndexedDB
   if ("indexedDB" in window) {
     getItems("restaurants").then(restaurants => {
@@ -51,10 +48,7 @@ export function fetchRestaurantById(restaurantID, callback) {
         callback(null, data);
       }
     })
-    .catch(err => {
-      // Oops!. Got an error from server.
-      const error = `Request failed. Returned status of ${err}`;
-    });
+    .catch(err => console.log(err));
   // Fetch from IndexedDB
   if ("indexedDB" in window) {
     getItem("restaurants", restaurantID).then(restaurant => {
@@ -89,10 +83,7 @@ export function updateRestaurant(body, callback) {
         callback(null, data);
       }
     })
-    .catch(err => {
-      // Oops!. Got an error from server.
-      const error = `Request failed. Returned status of ${err}`;
-    });
+    .catch(err => console.log(err));
 }
 
 /**
@@ -254,6 +245,7 @@ export function postReviewDirectly(body) {
  * Fetch all reviews matching a particular restaurant ID
  */
 export function fetchReviewsForRestaurant(restaurantID, callback) {
+  console.log("[App] Fetching Reviews");
   // Fetch all reviews
   // http://localhost:1337/reviews/?restaurant_id=<restaurant_id>
   let networkDataReceived = false;
@@ -269,20 +261,27 @@ export function fetchReviewsForRestaurant(restaurantID, callback) {
         callback(null, data);
       }
     })
-    .catch(err => {
-      // Oops!. Got an error from server.
-      const error = `Request failed. Returned status of ${err}`;
-    });
+    .catch(err => console.log(err));
   // Fetch from IndexedDB
   if ("indexedDB" in window) {
-    getItems("reviews").then(reviews => {
-      const reviewsForThisRestaurant = reviews.filter(
-        review => review.restaurant_id == restaurantID
-      );
-      if (!networkDataReceived) {
-        callback(null, reviewsForThisRestaurant);
+    console.log("Fetching reviews from IDB");
+    const getReviews = getItems("reviews").then(reviews =>
+      reviews
+        .filter(review => review.restaurant_id == restaurantID)
+        .map(review => ({ ...review, isDraft: false }))
+    );
+    const getDraftReviews = getItems("sync-reviews").then(reviews =>
+      reviews
+        .filter(review => review.restaurant_id == restaurantID)
+        .map(review => ({ ...review, isDraft: true }))
+    );
+    Promise.all([getReviews, getDraftReviews]).then(
+      ([reviews, draftReviews]) => {
+        if (reviews && draftReviews) {
+          callback(null, [...reviews, ...draftReviews]);
+        }
       }
-    });
+    );
   }
 }
 
